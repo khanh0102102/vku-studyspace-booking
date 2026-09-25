@@ -1,0 +1,26 @@
+{
+  "expo": {
+    "name": "VKU StudySpace",
+    "slug": "vku-studyspace",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "scheme": "vkustudyspace",
+    "android": {
+      "package": "vn.edu.vku.studyspace"
+    },
+    "ios": {
+      "bundleIdentifier": "vn.edu.vku.studyspace",
+      "supportsTablet": true
+    },
+    "plugins": [
+      [
+        "expo-notifications",
+        {
+          "color": "#205CFF",
+          "defaultChannel": "booking-reminders"
+        }
+      ]
+    ]
+  }
+}
