@@ -13,7 +13,7 @@
 
 VKU students often need a quiet room or computer laboratory but cannot reliably know whether it is free without going to the building. Manual sign-up also makes double booking likely. VKU StudySpace is a mobile application that lets a student discover campus rooms, filter them by practical requirements, select a date and discrete two-hour time slot, then create a digital booking pass.
 
-The goal is a clear, fast flow: **discover → filter → choose time → reserve → check in**. The application is built in React Native with Expo so one TypeScript codebase runs on Android and iOS. It is designed as an offline-first demonstrator: room data includes deterministic occupancy rules, while student reservations are persisted locally. This allows the required availability and conflict behavior to be demonstrated on a physical device without a backend account.
+The goal is a clear, fast flow: **discover → filter → choose time → reserve → check in**. The application is built in React Native with Expo so one TypeScript codebase runs on Android and iOS. The booking layer now uses Supabase PostgreSQL for shared reservations and Supabase Realtime for live cross-device availability. Zustand plus AsyncStorage remains the local cache and UI state layer.
 
 ## 2. Main functionality
 
@@ -35,11 +35,11 @@ For responsive rendering, the Discover feed uses a memoized RoomCard, stable eve
 
 The implementation satisfies the requested booking flow, storage, local reminder and performance-focused room feed. It can be validated on a physical device using Expo Go: filtering takes effect immediately, occupied slots cannot be pressed, booking opens a QR pass, and booked data remains after restarting the app.
 
-Because the assignment does not provide a server, availability is locally simulated. In a real deployment, a REST/GraphQL service would own room inventory and a database transaction or unique constraint would be the final protection against two students reserving the same slot. A WebSocket, Firebase or Supabase subscription could update availability across devices. The existing store-level validation would remain as a fast client-side guard.
+The shared reservation backend is implemented with Supabase. A PostgreSQL unique constraint on (room_id, date_key, slot_id) is the authoritative double-booking guard. The mobile client submits through the reserve_room RPC, and a Supabase Realtime Postgres Changes subscription propagates INSERT/DELETE events to every connected device. Zustand updates availabilityReservations immediately after each event, so another phone can see a slot become unavailable without restarting. Client-side validation remains a fast UX guard; the database decides the final outcome.
 
 ## 5. Conclusion
 
-VKU StudySpace demonstrates a practical React Native/Expo reservation application with a polished campus-oriented interface. The architecture uses TypeScript, React Navigation, Zustand, AsyncStorage and Expo Notifications in a maintainable way. It meets the project objectives and can be extended with authentication, a backend reservation API, administrative room management and true multi-user real-time updates.
+VKU StudySpace demonstrates a practical React Native/Expo reservation application with a polished campus-oriented interface. The architecture uses TypeScript, React Navigation, Zustand, AsyncStorage, Expo Notifications, Supabase PostgreSQL and Supabase Realtime in a maintainable way. It meets the requested cross-device booking flow and leaves a clear path for authentication, administrative room management and stricter production RLS policies.
 
 ## References
 

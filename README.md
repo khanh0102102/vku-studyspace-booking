@@ -9,10 +9,10 @@ VKU StudySpace lets students discover campus study rooms, filter the list instan
 - **Fast room discovery:** FlatList room feed with remote room photos, building/floor, capacity, equipment tags and live Available now / Occupied status.
 - **Multi-parameter filters:** instant full-text search plus persisted building, minimum-capacity and equipment chips.
 - **7-day reservation flow:** 7-day selector and 4 discrete two-hour slots: 07:30–09:30, 09:30–11:30, 13:00–15:00 and 15:00–17:00.
-- **Conflict prevention:** past slots, the supplied real-time occupancy feed, and the student's existing reservation are disabled. The store validates again immediately before committing a booking, so the UI cannot bypass the rule.
+- **Conflict prevention:** past slots, seeded campus rules, and live remote reservations are disabled. The client checks availability before submitting, while a PostgreSQL unique constraint is the authoritative protection against double-booking.
 - **Booking pass:** every reservation receives a unique ID and QR payload in the form VKU|STUDYSPACE|booking-id|student-id, shown in an interactive check-in modal.
 - **Local notification:** after a successful booking, the app requests notification permission and schedules a reminder exactly 15 minutes before the slot begins.
-- **Persistent global state:** session, filters and reservations are stored locally with Zustand persist plus AsyncStorage; pending reminders are removed when the booking is cancelled.
+- **Persistent global state:** Zustand persist plus AsyncStorage keeps session, filters and recent booking/cache data. The store also tracks all server reservations needed to render live slot availability.
 - **Responsive lists:** memoized RoomCard, stable callbacks, fixed-card getItemLayout, clipped subviews and conservative FlatList batching settings.
 
 ## Tech stack
@@ -26,6 +26,7 @@ VKU StudySpace lets students discover campus study rooms, filter the list instan
 | QR pass | react-native-qrcode-svg |
 | Local reminders | expo-notifications |
 | Tests | Jest + Jest Expo |
+| Realtime backend | Supabase PostgreSQL + Realtime |
 
 ## Project structure
 
@@ -39,7 +40,9 @@ VKU StudySpace lets students discover campus study rooms, filter the list instan
 │   ├── navigation/                 # React Navigation stack
 │   ├── screens/                    # Discover, room details and bookings screens
 │   ├── services/notifications.ts   # Permission, schedule and cancellation APIs
-│   ├── store/useBookingStore.ts    # Zustand state and authoritative booking action
+│   ├── services/supabase.ts         # Supabase client and Expo env configuration
+│   ├── services/realtimeBookings.ts # RPC booking + Realtime subscription
+│   ├── store/useBookingStore.ts    # Zustand state and realtime synchronization
 │   ├── types/                      # Shared TypeScript domain models
 │   └── utils/                      # Date helpers and pure conflict engine
 ├── __tests__/booking.test.ts       # Conflict-engine unit tests
@@ -101,14 +104,32 @@ npx expo run:android
 npx eas build --platform android
 ~~~
 
-## Data and “real-time” model
+## Supabase realtime setup
 
-The assignment does not provide a booking backend. The app therefore ships with deterministic occupancy rules in src/data/rooms.ts, which act as a local simulation of a server’s current reservations. New bookings are immediately added to the Zustand store and all visible room/slot status is recalculated. To connect a real API later:
+The app now supports a shared multi-device reservation backend. The booking flow is:
 
-1. Replace ROOMS / busyRules with a room-and-availability query.
-2. Call reserveRoom only after a server transaction or use a server-issued booking ID.
-3. Subscribe to a WebSocket, Supabase or Firebase channel and merge availability events into the store.
-4. Keep the client-side check as an optimistic UX guard, but make the server transaction authoritative.
+~~~text
+Device A / Device B
+        |
+        v
+  Supabase RPC reserve_room()
+        |
+        v
+PostgreSQL unique(room_id, date_key, slot_id)
+        |
+        v
+ reservation INSERT / DELETE
+        |
+        v
+ Supabase Realtime
+        |
+        v
+ Zustand availabilityReservations
+~~~
+
+Follow [docs/SUPABASE_SETUP.md](docs/SUPABASE_SETUP.md) to create the Supabase project, run the migration, configure the Expo environment variables, and test two devices. The repository never stores a service-role key.
+
+When Supabase variables are missing, the app falls back to the local demo mode. When variables are configured and the migration has been applied, booking and cancellation use the server and every connected device receives realtime INSERT/DELETE events.
 
 ## Submission checklist
 

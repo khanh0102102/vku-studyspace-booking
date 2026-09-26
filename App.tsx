@@ -9,6 +9,12 @@ import { useBookingStore } from '@/src/store/useBookingStore';
 
 export default function App() {
   const hasHydrated = useBookingStore((state) => state.hasHydrated);
+  const startRealtime = useBookingStore((state) => state.startRealtime);
+
+  React.useEffect(() => {
+    if (!hasHydrated) return;
+    return startRealtime();
+  }, [hasHydrated, startRealtime]);
 
   return (
     <SafeAreaProvider>

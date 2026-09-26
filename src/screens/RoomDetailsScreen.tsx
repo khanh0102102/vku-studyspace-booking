@@ -31,7 +31,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'RoomDetails'>;
 
 export function RoomDetailsScreen({ navigation, route }: Props) {
   const room = ROOMS.find((item) => item.id === route.params.roomId);
-  const reservations = useBookingStore((state) => state.reservations);
+  const reservations = useBookingStore((state) => state.availabilityReservations);
   const reserveRoom = useBookingStore((state) => state.reserveRoom);
   const setNotificationId = useBookingStore((state) => state.setNotificationId);
   const dateOptions = React.useMemo(() => getNextSevenDays(), []);
@@ -67,7 +67,7 @@ export function RoomDetailsScreen({ navigation, route }: Props) {
     }
 
     setSubmitting(true);
-    const attempt = reserveRoom({
+    const attempt = await reserveRoom({
       roomId: room.id,
       dateKey: selectedDate,
       slotId: selectedSlot.id,
@@ -184,7 +184,7 @@ export function RoomDetailsScreen({ navigation, route }: Props) {
                 : myBooking
                   ? 'Your booking'
                   : seededBusy
-                    ? 'Booked'
+                    ? 'Scheduled unavailable'
                     : 'Available';
 
               return (

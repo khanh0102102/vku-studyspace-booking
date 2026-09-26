@@ -110,8 +110,14 @@ export function MyBookingsScreen({ navigation }: Props) {
             style: 'destructive',
             onPress: () => {
               void (async () => {
-                await cancelBookingReminder(reservation.notificationId);
-                cancelBooking(reservation.id);
+                try {
+                  await cancelBookingReminder(reservation.notificationId);
+                  await cancelBooking(reservation.id);
+                } catch (error) {
+                  const message =
+                    error instanceof Error ? error.message : 'Could not cancel this reservation.';
+                  Alert.alert('Could not cancel reservation', message);
+                }
               })();
             },
           },
