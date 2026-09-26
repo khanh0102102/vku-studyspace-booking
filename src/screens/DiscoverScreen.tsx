@@ -80,6 +80,16 @@ export function DiscoverScreen({ navigation }: Props) {
     [filters],
   );
 
+  const upcomingBookingCount = React.useMemo(
+    () =>
+      ownReservations.filter(
+        (reservation) =>
+          reservation.status !== 'cancelled' &&
+          new Date(reservation.endAt).getTime() > now.getTime(),
+      ).length,
+    [now, ownReservations],
+  );
+
   const refresh = React.useCallback(async () => {
     setRefreshing(true);
     try {
@@ -127,9 +137,9 @@ export function DiscoverScreen({ navigation }: Props) {
             style={({ pressed }) => [styles.bookingIcon, pressed && styles.pressed]}
           >
             <Ionicons color={colors.primary} name="calendar-outline" size={23} />
-            {ownReservations.length > 0 && (
+            {upcomingBookingCount > 0 && (
               <View style={styles.counter}>
-                <Text style={styles.counterText}>{ownReservations.length > 9 ? '9+' : ownReservations.length}</Text>
+                <Text style={styles.counterText}>{upcomingBookingCount > 9 ? '9+' : upcomingBookingCount}</Text>
               </View>
             )}
           </Pressable>
