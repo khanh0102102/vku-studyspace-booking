@@ -1,6 +1,13 @@
 import { TIME_SLOTS } from '@/src/constants/slots';
-import { Room, Reservation, TimeSlot } from '@/src/types';
-import { dateFromKey, isSlotInPast, slotById, slotEndDate, slotStartDate, toDateKey } from './date';
+import { BookingAvailability, Room, Reservation, TimeSlot } from '@/src/types';
+import {
+  dateFromKey,
+  isSlotInPast,
+  slotById,
+  slotEndDate,
+  slotStartDate,
+  toDateKey,
+} from './date';
 
 export function isSeededSlotBusy(room: Room, dateKey: string, slotId: string): boolean {
   const weekday = dateFromKey(dateKey).getDay();
@@ -10,7 +17,7 @@ export function isSeededSlotBusy(room: Room, dateKey: string, slotId: string): b
 }
 
 export function isBookedByStudent(
-  reservations: Reservation[],
+  reservations: BookingAvailability[],
   roomId: string,
   dateKey: string,
   slotId: string,
@@ -25,7 +32,7 @@ export function isBookedByStudent(
 
 export function isSlotUnavailable(
   room: Room,
-  reservations: Reservation[],
+  reservations: BookingAvailability[],
   dateKey: string,
   slot: TimeSlot,
   now = new Date(),
@@ -37,7 +44,11 @@ export function isSlotUnavailable(
   );
 }
 
-export function isRoomOccupiedNow(room: Room, reservations: Reservation[], now = new Date()): boolean {
+export function isRoomOccupiedNow(
+  room: Room,
+  reservations: BookingAvailability[],
+  now = new Date(),
+): boolean {
   const dateKey = toDateKey(now);
   const activeSlot = TIME_SLOTS.find((slot) => {
     const start = slotStartDate(dateKey, slot).getTime();
@@ -66,4 +77,23 @@ export function makeReservationId(): string {
 export function isReservationPast(reservation: Reservation, now = new Date()): boolean {
   const slot = slotById(reservation.slotId);
   return !slot || slotEndDate(reservation.dateKey, slot).getTime() <= now.getTime();
+}
+
+export function canCancelReservation(reservation: Reservation, now = new Date()): boolean {
+  return (
+    reservation.status === 'confirmed' &&
+    new Date(reservation.startAt).getTime() > now.getTime()
+  );
+}
+
+export function canCheckInReservation(reservation: Reservation, now = new Date()): boolean {
+  const startAt = new Date(reservation.startAt).getTime();
+  const endAt = new Date(reservation.endAt).getTime();
+  const nowAt = now.getTime();
+
+  return (
+    reservation.status === 'confirmed' &&
+    nowAt >= startAt - 30 * 60 * 1000 &&
+    nowAt < endAt
+  );
 }
