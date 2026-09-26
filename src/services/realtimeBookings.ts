@@ -7,6 +7,7 @@ export const REMOTE_BOOKING_DAYS = 7;
 
 interface ReservationRow {
   id: string;
+  user_id: string;
   room_id: string;
   room_name: string;
   building: Reservation['building'];
@@ -16,7 +17,6 @@ interface ReservationRow {
   slot_label: string;
   start_at: string;
   end_at: string;
-  student_id: string;
   created_at: string;
 }
 
@@ -29,6 +29,7 @@ export interface ReservationChangePayload {
 function mapRow(row: ReservationRow): Reservation {
   return {
     id: row.id,
+    userId: row.user_id,
     roomId: row.room_id,
     roomName: row.room_name,
     building: row.building,
@@ -39,9 +40,16 @@ function mapRow(row: ReservationRow): Reservation {
     startAt: row.start_at,
     endAt: row.end_at,
     qrValue: '',
-    studentId: row.student_id,
+    studentId: '',
     createdAt: row.created_at,
   };
+}
+
+function requireSupabase() {
+  if (!supabase) {
+    throw new Error('Supabase is not configured.');
+  }
+  return supabase;
 }
 
 export function isRealtimeReady(): boolean {
@@ -52,14 +60,12 @@ export async function fetchActiveReservations(
   fromDate: string,
   toDate: string,
 ): Promise<Reservation[]> {
-  if (!supabase) {
-    return [];
-  }
+  const client = requireSupabase();
 
-  const { data, error } = await supabase
+  const { data, error } = await client
     .from('reservations')
     .select(
-      'id, room_id, room_name, building, floor, date_key, slot_id, slot_label, start_at, end_at, student_id, created_at',
+      'id, user_id, room_id, room_name, building, floor, date_key, slot_id, slot_label, start_at, end_at, created_at',
     )
     .gte('date_key', fromDate)
     .lte('date_key', toDate)
@@ -73,24 +79,16 @@ export async function fetchActiveReservations(
 }
 
 export async function reserveRoomOnServer(
-  reservation: Reservation,
+  roomId: string,
+  dateKey: string,
+  slotId: string,
 ): Promise<Reservation> {
-  if (!supabase) {
-    throw new Error('Supabase is not configured.');
-  }
+  const client = requireSupabase();
 
-  const { data, error } = await supabase.rpc('reserve_room', {
-    p_id: reservation.id,
-    p_room_id: reservation.roomId,
-    p_room_name: reservation.roomName,
-    p_building: reservation.building,
-    p_floor: reservation.floor,
-    p_date_key: reservation.dateKey,
-    p_slot_id: reservation.slotId,
-    p_slot_label: reservation.slotLabel,
-    p_start_at: reservation.startAt,
-    p_end_at: reservation.endAt,
-    p_student_id: reservation.studentId,
+  const { data, error } = await client.rpc('reserve_room', {
+    p_room_id: roomId,
+    p_date_key: dateKey,
+    p_slot_id: slotId,
   });
 
   if (error) {
@@ -104,17 +102,11 @@ export async function reserveRoomOnServer(
   return mapRow(data as ReservationRow);
 }
 
-export async function cancelBookingOnServer(
-  reservationId: string,
-  studentId: string,
-): Promise<void> {
-  if (!supabase) {
-    throw new Error('Supabase is not configured.');
-  }
+export async function cancelBookingOnServer(reservationId: string): Promise<void> {
+  const client = requireSupabase();
 
-  const { error } = await supabase.rpc('cancel_booking', {
+  const { error } = await client.rpc('cancel_booking', {
     p_id: reservationId,
-    p_student_id: studentId,
   });
 
   if (error) {
