@@ -27,6 +27,7 @@ export interface Room {
 
 export interface Reservation {
   id: string;
+  userId: string;
   roomId: string;
   roomName: string;
   building: Building;
