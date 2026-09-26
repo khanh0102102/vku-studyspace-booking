@@ -15,7 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { FilterChip } from '@/src/components/FilterChip';
 import { ROOM_CARD_HEIGHT, RoomCard } from '@/src/components/RoomCard';
-import { colors } from '@/src/constants/theme';
+import { colors } from '@/src/constants/theme';\nimport { signOut } from '@/src/services/auth';
 import { ROOMS } from '@/src/data/rooms';
 import { useBookingStore } from '@/src/store/useBookingStore';
 import { BookingFilters, Building, Equipment, RootStackParamList, Room } from '@/src/types';
@@ -94,22 +94,38 @@ export function DiscoverScreen({ navigation }: Props) {
   const header = (
     <View>
       <View style={styles.topBar}>
-        <View>
-          <Text style={styles.greeting}>Good day, {session?.fullName.split(' ').slice(-1)[0] || 'Student'} 👋</Text>
+        <View style={styles.greetingBlock}>
+          <Text style={styles.greeting}>
+            Good day, {session?.fullName.split(' ').slice(-1)[0] || 'Student'} 👋
+          </Text>
           <Text style={styles.subGreeting}>Find your ideal place to study.</Text>
         </View>
-        <Pressable
-          accessibilityLabel="Open my bookings"
-          onPress={() => navigation.navigate('MyBookings')}
-          style={({ pressed }) => [styles.bookingIcon, pressed && styles.pressed]}
-        >
-          <Ionicons color={colors.primary} name="calendar-outline" size={23} />
-          {reservations.length > 0 && (
-            <View style={styles.counter}>
-              <Text style={styles.counterText}>{reservations.length > 9 ? '9+' : reservations.length}</Text>
-            </View>
-          )}
-        </Pressable>
+        <View style={styles.headerActions}>
+          <Pressable
+            accessibilityLabel="Open my bookings"
+            onPress={() => navigation.navigate('MyBookings')}
+            style={({ pressed }) => [styles.bookingIcon, pressed && styles.pressed]}
+          >
+            <Ionicons color={colors.primary} name="calendar-outline" size={23} />
+            {reservations.length > 0 && (
+              <View style={styles.counter}>
+                <Text style={styles.counterText}>{reservations.length > 9 ? '9+' : reservations.length}</Text>
+              </View>
+            )}
+          </Pressable>
+          <Pressable
+            accessibilityLabel="Sign out"
+            onPress={() =>
+              Alert.alert('Sign out?', 'You will need to sign in again to manage your bookings.', [
+                { text: 'Keep signed in', style: 'cancel' },
+                { text: 'Sign out', style: 'destructive', onPress: () => void signOut() },
+              ])
+            }
+            style={({ pressed }) => [styles.bookingIcon, pressed && styles.pressed]}
+          >
+            <Ionicons color={colors.ink} name="log-out-outline" size={22} />
+          </Pressable>
+        </View>
       </View>
 
       <View style={styles.searchBox}>
@@ -263,6 +279,15 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 21,
     marginTop: 12,
+  },
+  greetingBlock: {
+    flex: 1,
+    paddingRight: 12,
+  },
+  headerActions: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 8,
   },
   greeting: {
     color: colors.ink,
