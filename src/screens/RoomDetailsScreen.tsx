@@ -21,7 +21,6 @@ import { scheduleBookingReminder } from '@/src/services/notifications';
 import { useBookingStore } from '@/src/store/useBookingStore';
 import { Reservation, RootStackParamList, TimeSlot } from '@/src/types';
 import {
-  isBookedByStudent,
   isSeededSlotBusy,
   isSlotUnavailable,
 } from '@/src/utils/booking';
