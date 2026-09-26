@@ -1,6 +1,6 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 
-import { Reservation } from '@/src/types';
+import { RealtimeStatus, Reservation } from '@/src/types';
 import { supabase } from '@/src/services/supabase';
 
 export const REMOTE_BOOKING_DAYS = 7;
@@ -124,6 +124,7 @@ export async function cancelBookingOnServer(
 
 export function subscribeToReservationChanges(
   onChange: (payload: ReservationChangePayload) => void,
+  onStatus: (status: RealtimeStatus) => void,
 ): () => void {
   if (!supabase) {
     return () => undefined;
@@ -155,7 +156,15 @@ export function subscribeToReservationChanges(
         });
       },
     )
-    .subscribe();
+    .subscribe((status) => {
+      if (status === 'SUBSCRIBED') {
+        onStatus('connected');
+      } else if (status === 'TIMED_OUT' || status === 'CHANNEL_ERROR') {
+        onStatus('error');
+      } else if (status === 'CLOSED') {
+        onStatus('offline');
+      }
+    });
 
   return () => {
     void client.removeChannel(channel);
