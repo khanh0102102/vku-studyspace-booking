@@ -17,7 +17,7 @@ import { signInWithPassword, signUpWithPassword } from '@/src/services/auth';
 import { isSupabaseConfigured } from '@/src/services/supabase';
 
 function isValidEmail(email: string): boolean {
-  return /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email);
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
 export function AuthScreen() {
@@ -35,7 +35,7 @@ export function AuthScreen() {
     setMessage(null);
 
     const normalizedEmail = email.trim().toLowerCase();
-    const normalizedStudentId = studentId.trim().toUpperCase().replace(/\\s+/g, '');
+    const normalizedStudentId = studentId.trim().toUpperCase().replace(/\s+/g, '');
     const normalizedName = fullName.trim();
 
     if (!isValidEmail(normalizedEmail)) {
