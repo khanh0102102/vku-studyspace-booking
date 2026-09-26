@@ -41,7 +41,7 @@ VKU StudySpace lets students discover campus study rooms, filter the list instan
 │   ├── screens/                    # Discover, room details and bookings screens
 │   ├── services/notifications.ts   # Permission, schedule and cancellation APIs
 │   ├── services/supabase.ts         # Supabase client and Expo env configuration
-│   ├── services/realtimeBookings.ts # RPC booking + Realtime subscription
+│   ├── services/realtimeBookings.ts # RPC booking/lifecycle + private/public Realtime feeds
 │   ├── store/useBookingStore.ts    # Zustand state and realtime synchronization
 │   ├── types/                      # Shared TypeScript domain models
 │   └── utils/                      # Date helpers and pure conflict engine
@@ -88,8 +88,8 @@ npm test             # conflict-engine tests
 1. On **Discover**, search lab, then choose Building B, capacity 10+ seats, and High-spec PC.
 2. Open **Digital Lab B401**. Select a date and an enabled slot; disabled grey slots demonstrate live conflict prevention.
 3. Tap **Reserve**. Allow notifications when prompted. The QR booking pass opens, with a unique booking ID and check-in action.
-4. Open **My bookings** using the calendar icon. Show the QR pass again, then cancel the reservation to demonstrate state removal and reminder cancellation.
-5. Close and reopen the app to demonstrate persisted filters/reservations (before cancellation).
+4. Open **My bookings** using the calendar icon. Show the QR pass again; when the booking reaches the check-in window, use **Confirm check-in** to persist the check-in state on the server.
+5. Cancel another future booking to demonstrate soft-cancellation history, slot release and reminder cancellation.
 
 ## Local-notification notes
 
@@ -112,19 +112,24 @@ The app uses a shared Supabase Auth + PostgreSQL backend. The booking flow is:
 Device A / Device B
         |
         v
-  Supabase RPC reserve_room()
+  Device A / Device B
         |
-        v
-PostgreSQL unique(room_id, date_key, slot_id)
+        +--> Authenticated RPC reserve_room()
+        |          |
+        |          v
+        |   PostgreSQL transaction
+        |     - server validates room/date/slot
+        |     - unique active booking constraints
+        |     - inserts private reservation
+        |     - inserts public occupancy row
+        |          |
+        |          +--> private reservation Realtime (owner only)
+        |          |
+        |          +--> occupancy Realtime (availability only)
         |
-        v
- reservation INSERT / DELETE
+        +--> cancel_booking() -> cancelled history + occupancy released
         |
-        v
- Supabase Realtime
-        |
-        v
- Zustand availabilityReservations
+        +--> check_in_booking() -> checked_in state
 ~~~
 
 Follow [docs/SUPABASE_SETUP.md](docs/SUPABASE_SETUP.md) to create the Supabase project, run the migration, configure the Expo environment variables, and test two devices. The repository never stores a service-role key.
@@ -139,6 +144,8 @@ Supabase configuration and authentication are required for booking. There is no 
 - [ ] Capture the Expo QR code / Snack URL and add it to the repository description or this README.
 - [ ] Fill in student, course and lecturer fields in [docs/TECHNICAL_REPORT.md](docs/TECHNICAL_REPORT.md), export it as PDF, and submit it.
 
-## Known scope boundary
+## Production-minded scope
 
-The project is a complete offline-first frontend demonstration. A genuine multi-user “real-time” product needs a protected backend reservation transaction and server-driven availability feed; the current deterministic feed makes the required conflict and status behavior testable without credentials or a network service.
+This version uses Supabase Auth, PostgreSQL RPC transactions, RLS, a private reservation stream, and a separate public occupancy stream. Booking ownership is derived from `auth.uid()`, not from client-supplied student identifiers. Cancellation is recorded as history rather than deleting the reservation, and check-in is validated by the database.
+
+The remaining university-integration boundary is intentional: room administration, VKU SSO/OIDC, institutional email/SMTP, audit dashboards, and operational monitoring would normally be owned by the campus backend/admin team.
