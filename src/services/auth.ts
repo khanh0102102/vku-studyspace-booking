@@ -70,7 +70,7 @@ export async function signUpWithPassword(input: {
   password: string;
   fullName: string;
   studentId: string;
-}): Promise<{ needsEmailConfirmation: boolean }> {
+}): Promise<void> {
   const client = requireSupabase();
   const { data, error } = await client.auth.signUp({
     email: input.email,
@@ -87,25 +87,16 @@ export async function signUpWithPassword(input: {
     throw new Error(error.message);
   }
 
-  return { needsEmailConfirmation: !data.session };
+  if (!data.session) {
+    throw new Error(
+      'Sign-up succeeded but no session was created. Turn off "Confirm email" in Supabase Authentication > Providers > Email, then try again.',
+    );
+  }
 }
 
 export async function signOut(): Promise<void> {
   const client = requireSupabase();
   const { error } = await client.auth.signOut();
-  if (error) {
-    throw new Error(error.message);
-  }
-}
-
-
-export async function resendSignupConfirmation(email: string): Promise<void> {
-  const client = requireSupabase();
-  const { error } = await client.auth.resend({
-    type: 'signup',
-    email,
-  });
-
   if (error) {
     throw new Error(error.message);
   }
