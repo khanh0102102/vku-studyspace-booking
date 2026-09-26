@@ -51,7 +51,7 @@ VKU StudySpace lets students discover campus study rooms, filter the list instan
 
 ## Prerequisites
 
-- Node.js **20 LTS or newer**
+- Node.js **22 LTS or newer**
 - npm 10+ (or a compatible package manager)
 - Expo Go installed on a physical Android/iOS device for the demo
 - Phone and development computer on the same Wi-Fi network, or use Expo tunnel mode
