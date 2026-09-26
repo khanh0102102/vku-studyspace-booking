@@ -59,10 +59,8 @@ begin
         updated_at = now();
 
   -- Preserve the existing demo/test reservations made before Auth was introduced.
-  update public.reservations
-     set user_id = new.id
-   where user_id is null
-     and upper(trim(student_id)) = normalized_student_id;
+  -- Legacy demo reservations are intentionally not re-assigned to the new account.
+  -- They remain shared schedule occupancy with a null user_id.
 
   return new;
 end;
