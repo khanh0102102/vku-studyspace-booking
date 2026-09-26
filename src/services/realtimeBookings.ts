@@ -243,6 +243,7 @@ export function subscribeToReservationChanges(
 
 export function subscribeToBookingAvailabilityChanges(
   onChange: (payload: AvailabilityChangePayload) => void,
+  onStatus: (status: RealtimeStatus) => void,
 ): () => void {
   if (!supabase) {
     return () => undefined;
@@ -280,7 +281,15 @@ export function subscribeToBookingAvailabilityChanges(
         });
       },
     )
-    .subscribe();
+    .subscribe((status) => {
+      if (status === 'SUBSCRIBED') {
+        onStatus('connected');
+      } else if (status === 'TIMED_OUT' || status === 'CHANNEL_ERROR') {
+        onStatus('error');
+      } else if (status === 'CLOSED') {
+        onStatus('offline');
+      }
+    });
 
   return () => {
     void client.removeChannel(channel);
