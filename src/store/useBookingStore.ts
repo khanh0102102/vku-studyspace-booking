@@ -391,7 +391,7 @@ export const useBookingStore = create<BookingState>()(
 
             set((state) => ({
               availabilityReservations: [
-                change.new,
+                change.new!,
                 ...state.availabilityReservations.filter(
                   (item) => item.reservationId !== change.new!.reservationId,
                 ),
