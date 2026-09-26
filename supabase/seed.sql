@@ -1,7 +1,6 @@
 -- Optional demo seed data for a fresh Supabase project.
--- Run the migration first. This inserts future example bookings so that
--- a second device can immediately see unavailable slots before making new ones.
--- Remove or adjust these rows when demonstrating a completely empty schedule.
+-- Run all migrations first. These rows represent campus schedule occupancy,
+-- not a student's booking, so they intentionally have no user_id.
 
 insert into public.reservations (
   id, room_id, room_name, building, floor, date_key, slot_id, slot_label,
@@ -16,24 +15,8 @@ select
   current_date + 1,
   slot.id,
   slot.label,
-  make_timestamptz(
-    extract(year from current_date + 1)::integer,
-    extract(month from current_date + 1)::integer,
-    extract(day from current_date + 1)::integer,
-    split_part(slot.starts_at, ':', 1)::integer,
-    split_part(slot.starts_at, ':', 2)::integer,
-    0,
-    'Asia/Ho_Chi_Minh'
-  ),
-  make_timestamptz(
-    extract(year from current_date + 1)::integer,
-    extract(month from current_date + 1)::integer,
-    extract(day from current_date + 1)::integer,
-    split_part(slot.ends_at, ':', 1)::integer,
-    split_part(slot.ends_at, ':', 2)::integer,
-    0,
-    'Asia/Ho_Chi_Minh'
-  ),
+  ((current_date + 1)::text || ' ' || slot.starts_at)::timestamp at time zone 'Asia/Ho_Chi_Minh',
+  ((current_date + 1)::text || ' ' || slot.ends_at)::timestamp at time zone 'Asia/Ho_Chi_Minh',
   'demo-server'
 from (values
   ('b-401', 'Digital Lab B401', 'B', 'Floor 4'),
@@ -42,4 +25,4 @@ from (values
 cross join (values
   ('morning-1', '07:30 – 09:30', '07:30', '09:30')
 ) as slot(id, label, starts_at, ends_at)
-on conflict (room_id, date_key, slot_id) where status = 'confirmed' do nothing;
+on conflict (room_id, date_key, slot_id) do nothing;
