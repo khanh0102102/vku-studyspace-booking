@@ -58,8 +58,9 @@ function matchesFilters(room: Room, filters: BookingFilters): boolean {
 
 export function DiscoverScreen({ navigation }: Props) {
   const filters = useBookingStore((state) => state.filters);
-  const reservations = useBookingStore((state) => state.reservations);
+  const reservations = useBookingStore((state) => state.availabilityReservations);
   const session = useBookingStore((state) => state.session);
+  const realtimeStatus = useBookingStore((state) => state.realtimeStatus);
   const updateFilters = useBookingStore((state) => state.updateFilters);
   const resetFilters = useBookingStore((state) => state.resetFilters);
   const [now, setNow] = React.useState(() => new Date());
@@ -186,7 +187,30 @@ export function DiscoverScreen({ navigation }: Props) {
       </ScrollView>
 
       <View style={styles.resultsLine}>
-        <Text style={styles.resultsTitle}>Available study rooms</Text>
+        <View>
+          <Text style={styles.resultsTitle}>Available study rooms</Text>
+          <View style={styles.liveRow}>
+            <View
+              style={[
+                styles.liveDot,
+                realtimeStatus === 'connected'
+                  ? styles.liveDotConnected
+                  : realtimeStatus === 'connecting'
+                    ? styles.liveDotConnecting
+                    : styles.liveDotOffline,
+              ]}
+            />
+            <Text style={styles.liveText}>
+              {realtimeStatus === 'connected'
+                ? 'Live sync'
+                : realtimeStatus === 'connecting'
+                  ? 'Connecting…'
+                  : realtimeStatus === 'error'
+                    ? 'Realtime error'
+                    : 'Offline demo mode'}
+            </Text>
+          </View>
+        </View>
         <Text style={styles.resultsCount}>{filteredRooms.length + ' found'}</Text>
       </View>
     </View>
@@ -332,6 +356,31 @@ const styles = StyleSheet.create({
     color: colors.ink,
     fontSize: 17,
     fontWeight: '800',
+  },
+  liveRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    marginTop: 4,
+  },
+  liveDot: {
+    borderRadius: 4,
+    height: 7,
+    marginRight: 5,
+    width: 7,
+  },
+  liveDotConnected: {
+    backgroundColor: colors.success,
+  },
+  liveDotConnecting: {
+    backgroundColor: colors.primary,
+  },
+  liveDotOffline: {
+    backgroundColor: '#9EA8B9',
+  },
+  liveText: {
+    color: colors.muted,
+    fontSize: 11,
+    fontWeight: '700',
   },
   resultsCount: {
     color: colors.muted,

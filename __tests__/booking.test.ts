@@ -23,6 +23,7 @@ const reservation: Reservation = {
   startAt: '2030-01-08T07:30:00.000Z',
   endAt: '2030-01-08T09:30:00.000Z',
   qrValue: 'VKU|STUDYSPACE|BK-TEST-001|23IT123',
+  studentId: '23IT123',
   createdAt: '2030-01-01T00:00:00.000Z',
 };
 
