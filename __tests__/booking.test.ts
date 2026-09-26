@@ -1,6 +1,6 @@
 import { TIME_SLOTS } from '../src/constants/slots';
 import { ROOMS } from '../src/data/rooms';
-import { Reservation } from '../src/types';
+import { BookingAvailability, Reservation } from '../src/types';
 import {
   createPassValue,
   isBookedByStudent,
@@ -26,6 +26,7 @@ const reservation: Reservation = {
   qrValue: 'VKU|STUDYSPACE|BK-TEST-001|23IT123',
   studentId: '23IT123',
   createdAt: '2030-01-01T00:00:00.000Z',
+  status: 'confirmed',
 };
 
 describe('booking conflict engine', () => {
@@ -35,15 +36,30 @@ describe('booking conflict engine', () => {
   });
 
   it('detects a student reservation for the exact room/date/slot', () => {
-    expect(isBookedByStudent([reservation], room.id, reservation.dateKey, slot.id)).toBe(true);
-    expect(isBookedByStudent([reservation], room.id, reservation.dateKey, 'afternoon-1')).toBe(false);
+    const availability: BookingAvailability[] = [{
+      reservationId: reservation.id,
+      roomId: reservation.roomId,
+      dateKey: reservation.dateKey,
+      slotId: reservation.slotId,
+      startAt: reservation.startAt,
+      endAt: reservation.endAt,
+    }];
+    expect(isBookedByStudent(availability, room.id, reservation.dateKey, slot.id)).toBe(true);
+    expect(isBookedByStudent(availability, room.id, reservation.dateKey, 'afternoon-1')).toBe(false);
   });
 
   it('does not allow a slot once it is in the user reservation collection', () => {
     expect(
       isSlotUnavailable(
         room,
-        [reservation],
+        [{
+          reservationId: reservation.id,
+          roomId: reservation.roomId,
+          dateKey: reservation.dateKey,
+          slotId: reservation.slotId,
+          startAt: reservation.startAt,
+          endAt: reservation.endAt,
+        }],
         reservation.dateKey,
         slot,
         new Date('2030-01-01T00:00:00.000Z'),
