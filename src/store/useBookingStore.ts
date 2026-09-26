@@ -393,7 +393,7 @@ export const useBookingStore = create<BookingState>()(
               availabilityReservations: [
                 change.new,
                 ...state.availabilityReservations.filter(
-                  (item) => item.reservationId !== change.new?.reservationId,
+                  (item) => item.reservationId !== change.new!.reservationId,
                 ),
               ].sort((a, b) => a.startAt.localeCompare(b.startAt)),
               lastSyncedAt: new Date().toISOString(),
