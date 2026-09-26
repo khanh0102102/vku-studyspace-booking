@@ -12,7 +12,7 @@ VKU StudySpace lets students discover campus study rooms, filter the list instan
 - **Conflict prevention:** past slots, seeded campus rules, and live remote reservations are disabled. The client checks availability before submitting, while a PostgreSQL unique constraint is the authoritative protection against double-booking.
 - **Booking pass:** every reservation receives a unique ID and QR payload in the form VKU|STUDYSPACE|booking-id|student-id, shown in an interactive check-in modal.
 - **Local notification:** after a successful booking, the app requests notification permission and schedules a reminder exactly 15 minutes before the slot begins.
-- **Persistent global state:** Zustand persist plus AsyncStorage keeps session, filters and recent booking/cache data. The store also tracks all server reservations needed to render live slot availability.
+- **Authenticated accounts:** Supabase Auth uses one account per student/device. Each account has a VKU email, student ID and profile; booking ownership is tied to the authenticated user ID.
 - **Responsive lists:** memoized RoomCard, stable callbacks, fixed-card getItemLayout, clipped subviews and conservative FlatList batching settings.
 
 ## Tech stack
@@ -106,7 +106,7 @@ npx eas build --platform android
 
 ## Supabase realtime setup
 
-The app now supports a shared multi-device reservation backend. The booking flow is:
+The app uses a shared Supabase Auth + PostgreSQL backend. The booking flow is:
 
 ~~~text
 Device A / Device B
@@ -129,13 +129,13 @@ PostgreSQL unique(room_id, date_key, slot_id)
 
 Follow [docs/SUPABASE_SETUP.md](docs/SUPABASE_SETUP.md) to create the Supabase project, run the migration, configure the Expo environment variables, and test two devices. The repository never stores a service-role key.
 
-When Supabase variables are missing, the app falls back to the local demo mode. When variables are configured and the migration has been applied, booking and cancellation use the server and every connected device receives realtime INSERT/DELETE events.
+Supabase configuration and authentication are required for booking. There is no production fallback that silently stores bookings only in a browser cache.
 
 ## Submission checklist
 
 - [ ] Push this folder to a **public GitHub repository** and replace the clone URL above.
 - [ ] Run npm run typecheck and npm test.
-- [ ] Start Expo, test the complete flow on a physical phone, and record the 2–3 minute scenario above.
+- [ ] Create two student accounts, test separate sessions on Chrome/Edge, and record the realtime multi-user scenario.
 - [ ] Capture the Expo QR code / Snack URL and add it to the repository description or this README.
 - [ ] Fill in student, course and lecturer fields in [docs/TECHNICAL_REPORT.md](docs/TECHNICAL_REPORT.md), export it as PDF, and submit it.
 
