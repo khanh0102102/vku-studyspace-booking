@@ -1,48 +1,88 @@
-# Supabase realtime setup
+# Supabase production setup
 
-## 1. Create a Supabase project
+## 1. Create and configure the Supabase project
 
-Create a project in the Supabase Dashboard. Copy the Project URL and publishable key from the API/Connect panel.
+Create a Supabase project and copy the Project URL plus the **Publishable key** from the Dashboard.
 
-## 2. Run the database migration
-
-Open **SQL Editor** and run:
-
-supabase/migrations/20260926000000_realtime_bookings.sql
-
-This creates the reservations table, a unique room/date/slot constraint, the reserve_room and cancel_booking RPC functions, RLS read access, and the supabase_realtime publication.
-
-Optional: run supabase/seed.sql after the migration to add a sample future server booking.
-
-## 3. Configure Expo
-
-Copy .env.example to .env and fill:
+The app expects:
 
 EXPO_PUBLIC_SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co
 EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY=YOUR_SB_PUBLISHABLE_KEY
 
-Do not commit .env. Never put a Supabase service_role key in the mobile project.
+Never put a service_role or sb_secret_* key in the Expo app.
 
-## 4. Install and verify
+## 2. Configure Supabase Auth
 
-npm install
-npm run typecheck
-npm test
+Open **Authentication → Providers** and keep the **Email** provider enabled.
 
-## 5. Test true realtime
+For the student-only demo, the database trigger accepts only addresses ending in @vku.udn.vn.
 
-Start the app on two phones.
+Recommended production settings:
+- require email confirmation;
+- use a strong password policy;
+- configure the production Site URL and redirect URLs for the deployed web app;
+- use a university SSO/OIDC provider instead of password auth when VKU provides one.
 
-On Device A, open a room, select a future date and slot, then tap Reserve.
+## 3. Apply the migrations
 
-On Device B, keep the same room/date open. The slot should become unavailable when the Realtime INSERT arrives. Try another free slot to verify normal booking still works.
+Run these migrations in order:
 
-Then cancel the reservation on Device A. The Realtime DELETE event should make the slot available again on Device B.
+1. supabase/migrations/20260926000000_realtime_bookings.sql
+2. supabase/migrations/20260926000001_harden_validation_search_path.sql
+3. supabase/migrations/20260926000002_production_auth_booking_security.sql
 
-The Discover screen shows Live sync when the Realtime channel is connected. Offline demo mode means Supabase variables are missing and the previous local mode is active.
+The third migration adds:
+- Supabase Auth profile records linked to auth.users;
+- RLS-protected profiles;
+- server-owned room metadata and recurring blocked slots;
+- authenticated-only reservation reads;
+- RPC booking/cancellation that derives identity from auth.uid();
+- server-generated booking IDs;
+- unique room/date/slot and user/date/slot constraints.
 
-## 6. Security note
+Existing pre-Auth demo reservations are retained. When a matching student profile is first created, the profile trigger can attach legacy rows to that authenticated user.
 
-This mini-project still uses a demo student session, so the public RPC receives the student ID from the client. For production, replace this with Supabase Auth and derive identity from the authenticated JWT inside the database function/RLS policy. Never treat a client-provided student ID as a trusted identity.
+## 4. Configure Expo / Vercel
 
-Current Supabase Expo guidance uses @supabase/supabase-js, EXPO_PUBLIC_* variables, AsyncStorage for React Native auth/session storage, and Realtime subscriptions for database changes.
+Local .env:
+
+~~~env
+EXPO_PUBLIC_SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co
+EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY=YOUR_SB_PUBLISHABLE_KEY
+~~~
+
+On Vercel, add the same two variables as **Config** variables for Production/Preview as needed, then redeploy.
+
+## 5. Authentication flow
+
+A new student:
+1. Opens VKU StudySpace.
+2. Enters full name, student ID, VKU email and password.
+3. Supabase Auth creates the user.
+4. The database trigger creates public.profiles.
+5. After email confirmation, the student signs in.
+6. The app stores the Supabase Auth session and loads the user's profile.
+
+Chrome and Edge therefore have separate browser auth storage. A booking created by one signed-in account appears under **My bookings** only for that account.
+
+## 6. True realtime booking test
+
+Sign in as **Student A** in Chrome and **Student B** in Edge.
+
+On Chrome, reserve a future room/date/slot.
+
+On Edge, keep the same room/date open. The slot should change to **Unavailable** through Supabase Realtime without a page refresh.
+
+Then cancel the booking on Chrome. The slot should become **Available** on Edge.
+
+For double-booking, have A and B submit the same room/date/slot as close together as possible. The PostgreSQL unique constraint is the final authority, so at most one insert should succeed.
+
+## 7. Security model
+
+The browser only has the publishable key. It does not receive a service-role/secret key.
+
+The client does not send a trusted student ID to the booking RPC. The booking function uses auth.uid() to identify the caller and reads the student profile on the server.
+
+The reservation API is write-protected: clients get read access needed for realtime availability, but inserts/deletes are performed only through authenticated RPC functions. RLS is enabled on profiles, rooms, room rules, and reservations.
+
+For a real university deployment, add VKU SSO/OIDC, server-side role management, audit logging and operational monitoring before opening registration broadly.
