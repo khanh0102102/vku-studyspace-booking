@@ -13,6 +13,7 @@ const slot = TIME_SLOTS.find((item) => item.id === 'morning-1')!;
 
 const reservation: Reservation = {
   id: 'BK-TEST-001',
+  userId: 'user-test-001',
   roomId: room.id,
   roomName: room.name,
   building: room.building,
