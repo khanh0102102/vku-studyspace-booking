@@ -12,7 +12,7 @@ VKU StudySpace lets students discover campus study rooms, filter the list instan
 - **Conflict prevention:** past slots, seeded campus rules, and live remote reservations are disabled. The client checks availability before submitting, while a PostgreSQL unique constraint is the authoritative protection against double-booking.
 - **Booking pass:** every reservation receives a unique ID and QR payload in the form VKU|STUDYSPACE|booking-id|student-id, shown in an interactive check-in modal.
 - **Local notification:** after a successful booking, the app requests notification permission and schedules a reminder exactly 15 minutes before the slot begins.
-- **Authenticated accounts:** Supabase Auth uses one account per student/device. Each account has a VKU email, student ID and profile; booking ownership is tied to the authenticated user ID.
+- **Authenticated accounts:** Supabase Auth uses one account per student/device. Registration validates the basic form fields and signs the student in immediately without email verification; each account has a VKU email, student ID and profile.
 - **Responsive lists:** memoized RoomCard, stable callbacks, fixed-card getItemLayout, clipped subviews and conservative FlatList batching settings.
 
 ## Tech stack
@@ -132,7 +132,7 @@ Device A / Device B
         +--> check_in_booking() -> checked_in state
 ~~~
 
-Follow [docs/SUPABASE_SETUP.md](docs/SUPABASE_SETUP.md) to create the Supabase project, run the migration, configure the Expo environment variables, and test two devices. The repository never stores a service-role key.
+Follow [docs/SUPABASE_SETUP.md](docs/SUPABASE_SETUP.md) to create the Supabase project, run the migration, configure the Expo environment variables and Email provider setting, and test two devices. The repository never stores a service-role key.
 
 Supabase configuration and authentication are required for booking. There is no production fallback that silently stores bookings only in a browser cache.
 
