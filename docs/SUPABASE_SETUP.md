@@ -40,7 +40,7 @@ The third migration adds:
 - server-generated booking IDs;
 - unique room/date/slot and user/date/slot constraints.
 
-Existing pre-Auth demo reservations are retained. When a matching student profile is first created, the profile trigger can attach legacy rows to that authenticated user.
+Existing pre-Auth demo reservations are retained. Legacy demo reservations are intentionally kept as unowned schedule occupancy; they are not attached to student accounts.
 
 ## 4. Configure Expo / Vercel
 
