@@ -41,7 +41,7 @@ returns void
 language plpgsql
 as $$
 begin
-  if p_date_key < current_date or p_date_key > current_date + 6 then
+  if p_date_key < (timezone('Asia/Ho_Chi_Minh', now())::date) or p_date_key > (timezone('Asia/Ho_Chi_Minh', now())::date + 6) then
     raise exception 'Booking date must be within the next 7 calendar days'
       using errcode = '22023';
   end if;

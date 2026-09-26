@@ -228,8 +228,6 @@ export const useBookingStore = create<BookingState>()(
           return;
         }
 
-        set({ realtimeStatus: 'connecting' });
-
         const dates = getNextSevenDays();
         const fromDate = dates[0].key;
         const toDate = dates[dates.length - 1].key;
@@ -283,22 +281,28 @@ export const useBookingStore = create<BookingState>()(
 
             const incoming = withQrValue(change.new!);
             const session = get().session;
-            set((state) => ({
-              availabilityReservations: [
-                incoming,
-                ...state.availabilityReservations.filter((item) => item.id !== incoming.id),
-              ].sort((a, b) => a.startAt.localeCompare(b.startAt)),
-              reservations:
-                session && incoming.studentId === session.studentId
-                  ? [
-                      incoming,
-                      ...state.reservations
-                        .filter((item) => item.id !== incoming.id)
-                        .map((item) => ({ ...item })),
-                    ].sort((a, b) => a.startAt.localeCompare(b.startAt))
-                  : state.reservations,
-              lastSyncedAt: new Date().toISOString(),
-            }));
+            set((state) => {
+              const existing = state.reservations.find((item) => item.id === incoming.id);
+              const incomingWithLocalMeta = {
+                ...incoming,
+                notificationId: existing?.notificationId,
+              };
+
+              return {
+                availabilityReservations: [
+                  incomingWithLocalMeta,
+                  ...state.availabilityReservations.filter((item) => item.id !== incoming.id),
+                ].sort((a, b) => a.startAt.localeCompare(b.startAt)),
+                reservations:
+                  session && incomingWithLocalMeta.studentId === session.studentId
+                    ? [
+                        incomingWithLocalMeta,
+                        ...state.reservations.filter((item) => item.id !== incoming.id),
+                      ].sort((a, b) => a.startAt.localeCompare(b.startAt))
+                    : state.reservations,
+                lastSyncedAt: new Date().toISOString(),
+              };
+            });
           },
           (status) => {
             if (!stopped) {
