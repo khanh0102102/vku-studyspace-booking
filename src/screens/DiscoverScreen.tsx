@@ -15,7 +15,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { FilterChip } from '@/src/components/FilterChip';
 import { ROOM_CARD_HEIGHT, RoomCard } from '@/src/components/RoomCard';
-import { colors } from '@/src/constants/theme';\nimport { signOut } from '@/src/services/auth';
+import { colors } from '@/src/constants/theme';
+import { signOut } from '@/src/services/auth';
 import { ROOMS } from '@/src/data/rooms';
 import { useBookingStore } from '@/src/store/useBookingStore';
 import { BookingFilters, Building, Equipment, RootStackParamList, Room } from '@/src/types';
