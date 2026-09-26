@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React from 'react';
+import { Alert } from 'react-native';
 import {
   FlatList,
   Pressable,
