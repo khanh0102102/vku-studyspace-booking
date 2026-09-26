@@ -6,23 +6,23 @@ import { TIME_SLOTS } from '@/src/constants/slots';
 import { ROOMS } from '@/src/data/rooms';
 import {
   cancelBookingOnServer,
-  fetchActiveReservations,
+  checkInBookingOnServer,
+  fetchBookingAvailability,
+  fetchMyReservations,
   isRealtimeReady,
   reserveRoomOnServer,
+  subscribeToBookingAvailabilityChanges,
   subscribeToReservationChanges,
 } from '@/src/services/realtimeBookings';
 import {
+  BookingAvailability,
   BookingFilters,
   RealtimeStatus,
   Reservation,
   UserSession,
 } from '@/src/types';
-import {
-  createPassValue,
-  isBookedByStudent,
-  isSeededSlotBusy,
-} from '@/src/utils/booking';
-import { getNextSevenDays } from '@/src/utils/date';
+import { createPassValue, isBookedByStudent, isSeededSlotBusy } from '@/src/utils/booking';
+import { getNextSevenDays, shiftDateKey } from '@/src/utils/date';
 
 const DEFAULT_FILTERS: BookingFilters = {
   query: '',
@@ -44,7 +44,7 @@ interface ReservationInput {
 interface BookingState {
   session: UserSession | null;
   reservations: Reservation[];
-  availabilityReservations: Reservation[];
+  availabilityReservations: BookingAvailability[];
   filters: BookingFilters;
   hasHydrated: boolean;
   realtimeStatus: RealtimeStatus;
@@ -55,6 +55,7 @@ interface BookingState {
   reserveRoom: (input: ReservationInput) => Promise<BookingAttempt>;
   setNotificationId: (reservationId: string, notificationId?: string) => void;
   cancelBooking: (reservationId: string) => Promise<Reservation | undefined>;
+  checkInBooking: (reservationId: string) => Promise<Reservation | undefined>;
   syncAvailability: () => Promise<void>;
   startRealtime: () => () => void;
   setHasHydrated: (hasHydrated: boolean) => void;
@@ -68,14 +69,17 @@ function withQrValue(reservation: Reservation, studentId: string): Reservation {
   };
 }
 
-function mergeUserReservations(
+function mergeNotificationIds(
   current: Reservation[],
   remote: Reservation[],
   session: UserSession,
 ): Reservation[] {
   const notificationIds = new Map(
     current
-      .filter((reservation) => reservation.userId === session.id && reservation.notificationId)
+      .filter(
+        (reservation) =>
+          reservation.userId === session.id && reservation.notificationId,
+      )
       .map((reservation) => [reservation.id, reservation.notificationId]),
   );
 
@@ -86,6 +90,25 @@ function mergeUserReservations(
       notificationId: notificationIds.get(reservation.id),
     }))
     .sort((a, b) => a.startAt.localeCompare(b.startAt));
+}
+
+function addAvailability(
+  current: BookingAvailability[],
+  reservation: Reservation,
+): BookingAvailability[] {
+  const entry: BookingAvailability = {
+    reservationId: reservation.id,
+    roomId: reservation.roomId,
+    dateKey: reservation.dateKey,
+    slotId: reservation.slotId,
+    startAt: reservation.startAt,
+    endAt: reservation.endAt,
+  };
+
+  return [
+    entry,
+    ...current.filter((item) => item.reservationId !== reservation.id),
+  ].sort((a, b) => a.startAt.localeCompare(b.startAt));
 }
 
 export const useBookingStore = create<BookingState>()(
@@ -104,6 +127,7 @@ export const useBookingStore = create<BookingState>()(
           if (state.session?.id === session?.id) {
             return { session };
           }
+
           return {
             session,
             reservations: [],
@@ -152,17 +176,19 @@ export const useBookingStore = create<BookingState>()(
             reservations: [
               reservation,
               ...state.reservations.filter((item) => item.id !== reservation.id),
-            ],
-            availabilityReservations: [
+            ].sort((a, b) => a.startAt.localeCompare(b.startAt)),
+            availabilityReservations: addAvailability(
+              state.availabilityReservations,
               reservation,
-              ...state.availabilityReservations.filter((item) => item.id !== reservation.id),
-            ],
+            ),
           }));
 
           return { ok: true, reservation };
         } catch (error) {
           const message =
-            error instanceof Error ? error.message : 'Could not reach the booking server.';
+            error instanceof Error
+              ? error.message
+              : 'Could not reach the booking server.';
           return { ok: false, error: message };
         }
       },
@@ -177,24 +203,66 @@ export const useBookingStore = create<BookingState>()(
         })),
 
       cancelBooking: async (reservationId) => {
-        const reservation = get().reservations.find((item) => item.id === reservationId);
+        const reservation = get().reservations.find(
+          (item) => item.id === reservationId,
+        );
         const session = get().session;
+
         if (!reservation || !session) {
           return undefined;
         }
 
-        if (isRealtimeReady()) {
-          await cancelBookingOnServer(reservationId);
-        }
+        const cancelled = withQrValue(
+          await cancelBookingOnServer(reservationId),
+          session.studentId,
+        );
 
         set((state) => ({
-          reservations: state.reservations.filter((item) => item.id !== reservationId),
+          reservations: state.reservations.map((item) =>
+            item.id === cancelled.id
+              ? {
+                  ...item,
+                  ...cancelled,
+                  notificationId: reservation.notificationId,
+                }
+              : item,
+          ),
           availabilityReservations: state.availabilityReservations.filter(
-            (item) => item.id !== reservationId,
+            (item) => item.reservationId !== reservationId,
           ),
         }));
 
-        return reservation;
+        return cancelled;
+      },
+
+      checkInBooking: async (reservationId) => {
+        const reservation = get().reservations.find(
+          (item) => item.id === reservationId,
+        );
+        const session = get().session;
+
+        if (!reservation || !session) {
+          return undefined;
+        }
+
+        const checkedIn = withQrValue(
+          await checkInBookingOnServer(reservationId),
+          session.studentId,
+        );
+
+        set((state) => ({
+          reservations: state.reservations.map((item) =>
+            item.id === checkedIn.id
+              ? {
+                  ...item,
+                  ...checkedIn,
+                  notificationId: reservation.notificationId,
+                }
+              : item,
+          ),
+        }));
+
+        return checkedIn;
       },
 
       syncAvailability: async () => {
@@ -204,21 +272,31 @@ export const useBookingStore = create<BookingState>()(
         }
 
         const dates = getNextSevenDays();
-        const remote = await fetchActiveReservations(dates[0].key, dates[dates.length - 1].key);
-        const session = get().session;
-        const reservations = session
-          ? mergeUserReservations(get().reservations, remote, session)
-          : [];
+        const session = get().session as UserSession;
+        const fromDate = shiftDateKey(dates[0].key, -30);
+        const toDate = dates[dates.length - 1].key;
+
+        const [availability, ownReservations] = await Promise.all([
+          fetchBookingAvailability(dates[0].key, dates[dates.length - 1].key),
+          fetchMyReservations(fromDate, toDate),
+        ]);
 
         set({
-          availabilityReservations: remote,
-          reservations,
+          availabilityReservations: availability,
+          reservations: mergeNotificationIds(
+            get().reservations,
+            ownReservations,
+            session,
+          ),
           lastSyncedAt: new Date().toISOString(),
+          realtimeStatus: 'connected',
         });
       },
 
       startRealtime: () => {
         let stopped = false;
+        let reservationChannelStatus: RealtimeStatus = 'connecting';
+        let availabilityChannelStatus: RealtimeStatus = 'connecting';
 
         if (!isRealtimeReady() || !get().session) {
           set({ realtimeStatus: 'error' });
@@ -227,24 +305,37 @@ export const useBookingStore = create<BookingState>()(
 
         set({ realtimeStatus: 'connecting' });
 
-        const unsubscribe = subscribeToReservationChanges(
+        const updateCombinedStatus = () => {
+          if (stopped) return;
+          if (
+            reservationChannelStatus === 'connected' &&
+            availabilityChannelStatus === 'connected'
+          ) {
+            set({ realtimeStatus: 'connected' });
+            return;
+          }
+
+          if (
+            reservationChannelStatus === 'error' ||
+            availabilityChannelStatus === 'error'
+          ) {
+            set({ realtimeStatus: 'error' });
+            return;
+          }
+
+          set({ realtimeStatus: 'connecting' });
+        };
+
+        const unsubscribeReservations = subscribeToReservationChanges(
           (change) => {
-            if (stopped) {
-              return;
-            }
+            if (stopped) return;
 
             if (change.eventType === 'DELETE') {
-              const deletedId = change.oldId;
-              if (!deletedId) {
-                return;
-              }
+              if (!change.oldId) return;
 
               set((state) => ({
-                availabilityReservations: state.availabilityReservations.filter(
-                  (reservation) => reservation.id !== deletedId,
-                ),
                 reservations: state.reservations.filter(
-                  (reservation) => reservation.id !== deletedId,
+                  (reservation) => reservation.id !== change.oldId,
                 ),
                 lastSyncedAt: new Date().toISOString(),
               }));
@@ -252,39 +343,65 @@ export const useBookingStore = create<BookingState>()(
             }
 
             const incoming = change.new;
-            if (!incoming) {
+            const session = get().session;
+            if (!incoming || !session || incoming.userId !== session.id) {
               return;
             }
 
-            const session = get().session;
-            const existing = get().reservations.find((item) => item.id === incoming.id);
-            const availabilityReservation =
-              session && incoming.userId === session.id
-                ? withQrValue(incoming, session.studentId)
-                : incoming;
+            const existing = get().reservations.find(
+              (item) => item.id === incoming.id,
+            );
 
             set((state) => ({
-              availabilityReservations: [
-                availabilityReservation,
-                ...state.availabilityReservations.filter((item) => item.id !== incoming.id),
+              reservations: [
+                {
+                  ...withQrValue(incoming, session.studentId),
+                  notificationId: existing?.notificationId,
+                },
+                ...state.reservations.filter(
+                  (item) => item.id !== incoming.id,
+                ),
               ].sort((a, b) => a.startAt.localeCompare(b.startAt)),
-              reservations:
-                session && incoming.userId === session.id
-                  ? [
-                      {
-                        ...withQrValue(incoming, session.studentId),
-                        notificationId: existing?.notificationId,
-                      },
-                      ...state.reservations.filter((item) => item.id !== incoming.id),
-                    ].sort((a, b) => a.startAt.localeCompare(b.startAt))
-                  : state.reservations,
               lastSyncedAt: new Date().toISOString(),
             }));
           },
           (status) => {
-            if (!stopped) {
-              set({ realtimeStatus: status });
+            reservationChannelStatus = status;
+            updateCombinedStatus();
+          },
+        );
+
+        const unsubscribeAvailability = subscribeToBookingAvailabilityChanges(
+          (change) => {
+            if (stopped) return;
+
+            if (change.eventType === 'DELETE') {
+              if (!change.oldReservationId) return;
+
+              set((state) => ({
+                availabilityReservations: state.availabilityReservations.filter(
+                  (item) => item.reservationId !== change.oldReservationId,
+                ),
+                lastSyncedAt: new Date().toISOString(),
+              }));
+              return;
             }
+
+            if (!change.new) return;
+
+            set((state) => ({
+              availabilityReservations: [
+                change.new!,
+                ...state.availabilityReservations.filter(
+                  (item) => item.reservationId !== change.new!.reservationId,
+                ),
+              ].sort((a, b) => a.startAt.localeCompare(b.startAt)),
+              lastSyncedAt: new Date().toISOString(),
+            }));
+          },
+          (status) => {
+            availabilityChannelStatus = status;
+            updateCombinedStatus();
           },
         );
 
@@ -298,7 +415,8 @@ export const useBookingStore = create<BookingState>()(
 
         return () => {
           stopped = true;
-          unsubscribe();
+          unsubscribeReservations();
+          unsubscribeAvailability();
           set({ realtimeStatus: 'offline' });
         };
       },

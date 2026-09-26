@@ -21,7 +21,6 @@ import { scheduleBookingReminder } from '@/src/services/notifications';
 import { useBookingStore } from '@/src/store/useBookingStore';
 import { Reservation, RootStackParamList, TimeSlot } from '@/src/types';
 import {
-  isBookedByStudent,
   isSeededSlotBusy,
   isSlotUnavailable,
 } from '@/src/utils/booking';
@@ -31,8 +30,10 @@ type Props = NativeStackScreenProps<RootStackParamList, 'RoomDetails'>;
 
 export function RoomDetailsScreen({ navigation, route }: Props) {
   const room = ROOMS.find((item) => item.id === route.params.roomId);
-  const reservations = useBookingStore((state) => state.availabilityReservations);
+  const availabilityReservations = useBookingStore((state) => state.availabilityReservations);
+  const ownReservations = useBookingStore((state) => state.reservations);
   const reserveRoom = useBookingStore((state) => state.reserveRoom);
+  const checkInBooking = useBookingStore((state) => state.checkInBooking);
   const setNotificationId = useBookingStore((state) => state.setNotificationId);
   const dateOptions = React.useMemo(() => getNextSevenDays(), []);
   const [selectedDate, setSelectedDate] = React.useState(dateOptions[0].key);
@@ -54,7 +55,7 @@ export function RoomDetailsScreen({ navigation, route }: Props) {
   const selectedSlot = TIME_SLOTS.find((item) => item.id === selectedSlotId);
   const canBook =
     Boolean(selectedSlot) &&
-    !isSlotUnavailable(room, reservations, selectedDate, selectedSlot as TimeSlot);
+    !isSlotUnavailable(room, availabilityReservations, selectedDate, selectedSlot as TimeSlot);
 
   const chooseDate = (dateKey: string) => {
     setSelectedDate(dateKey);
@@ -176,8 +177,19 @@ export function RoomDetailsScreen({ navigation, route }: Props) {
             {TIME_SLOTS.map((slot) => {
               const past = isSlotInPast(selectedDate, slot);
               const seededBusy = isSeededSlotBusy(room, selectedDate, slot.id);
-              const myBooking = isBookedByStudent(reservations, room.id, selectedDate, slot.id);
-              const unavailable = isSlotUnavailable(room, reservations, selectedDate, slot);
+              const myBooking = ownReservations.some(
+                (reservation) =>
+                  reservation.roomId === room.id &&
+                  reservation.dateKey === selectedDate &&
+                  reservation.slotId === slot.id &&
+                  reservation.status !== 'cancelled',
+              );
+              const unavailable = isSlotUnavailable(
+                room,
+                availabilityReservations,
+                selectedDate,
+                slot,
+              );
               const selected = selectedSlotId === slot.id;
               const availabilityText = past
                 ? 'Past'
@@ -239,7 +251,11 @@ export function RoomDetailsScreen({ navigation, route }: Props) {
         </Pressable>
       </View>
 
-      <BookingPassModal onClose={() => setPassReservation(null)} reservation={passReservation} />
+      <BookingPassModal
+        onCheckIn={async (reservationId) => checkInBooking(reservationId)}
+        onClose={() => setPassReservation(null)}
+        reservation={passReservation}
+      />
     </SafeAreaView>
   );
 }

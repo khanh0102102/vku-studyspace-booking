@@ -22,6 +22,12 @@ export function dateFromKey(key: string): Date {
   return new Date(parts[0], parts[1] - 1, parts[2]);
 }
 
+export function shiftDateKey(dateKey: string, days: number): string {
+  const date = dateFromKey(dateKey);
+  date.setDate(date.getDate() + days);
+  return toDateKey(date);
+}
+
 export function getNextSevenDays(now = new Date()): DateOption[] {
   const todayKey = toDateKey(now);
   return Array.from({ length: 7 }, (_, index) => {

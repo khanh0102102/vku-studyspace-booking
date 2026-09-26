@@ -62,10 +62,13 @@ export function DiscoverScreen({ navigation }: Props) {
   const filters = useBookingStore((state) => state.filters);
   const reservations = useBookingStore((state) => state.availabilityReservations);
   const session = useBookingStore((state) => state.session);
+  const ownReservations = useBookingStore((state) => state.reservations);
   const realtimeStatus = useBookingStore((state) => state.realtimeStatus);
+  const syncAvailability = useBookingStore((state) => state.syncAvailability);
   const updateFilters = useBookingStore((state) => state.updateFilters);
   const resetFilters = useBookingStore((state) => state.resetFilters);
   const [now, setNow] = React.useState(() => new Date());
+  const [refreshing, setRefreshing] = React.useState(false);
 
   React.useEffect(() => {
     const intervalId = setInterval(() => setNow(new Date()), 60_000);
@@ -76,6 +79,31 @@ export function DiscoverScreen({ navigation }: Props) {
     () => ROOMS.filter((room) => matchesFilters(room, filters)),
     [filters],
   );
+
+  const upcomingBookingCount = React.useMemo(
+    () =>
+      ownReservations.filter(
+        (reservation) =>
+          reservation.status !== 'cancelled' &&
+          new Date(reservation.endAt).getTime() > now.getTime(),
+      ).length,
+    [now, ownReservations],
+  );
+
+  const refresh = React.useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await syncAvailability();
+      setNow(new Date());
+    } catch (error) {
+      Alert.alert(
+        'Could not refresh availability',
+        error instanceof Error ? error.message : 'Please try again in a moment.',
+      );
+    } finally {
+      setRefreshing(false);
+    }
+  }, [syncAvailability]);
 
   const openRoom = React.useCallback(
     (roomId: string) => navigation.navigate('RoomDetails', { roomId }),
@@ -109,9 +137,9 @@ export function DiscoverScreen({ navigation }: Props) {
             style={({ pressed }) => [styles.bookingIcon, pressed && styles.pressed]}
           >
             <Ionicons color={colors.primary} name="calendar-outline" size={23} />
-            {reservations.length > 0 && (
+            {upcomingBookingCount > 0 && (
               <View style={styles.counter}>
-                <Text style={styles.counterText}>{reservations.length > 9 ? '9+' : reservations.length}</Text>
+                <Text style={styles.counterText}>{upcomingBookingCount > 9 ? '9+' : upcomingBookingCount}</Text>
               </View>
             )}
           </Pressable>
@@ -255,7 +283,7 @@ export function DiscoverScreen({ navigation }: Props) {
         }
         ListHeaderComponent={header}
         maxToRenderPerBatch={6}
-        refreshControl={<RefreshControl onRefresh={() => setNow(new Date())} refreshing={false} tintColor={colors.primary} />}
+        refreshControl={<RefreshControl onRefresh={() => void refresh()} refreshing={refreshing} tintColor={colors.primary} />}
         removeClippedSubviews
         renderItem={renderRoom}
         showsVerticalScrollIndicator={false}

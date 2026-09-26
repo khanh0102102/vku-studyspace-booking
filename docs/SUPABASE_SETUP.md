@@ -30,6 +30,7 @@ Run these migrations in order:
 1. supabase/migrations/20260926000000_realtime_bookings.sql
 2. supabase/migrations/20260926000001_harden_validation_search_path.sql
 3. supabase/migrations/20260926000002_production_auth_booking_security.sql
+4. supabase/migrations/20260926000003_production_booking_lifecycle.sql
 
 The third migration adds:
 - Supabase Auth profile records linked to auth.users;
@@ -85,4 +86,11 @@ The client does not send a trusted student ID to the booking RPC. The booking fu
 
 The reservation API is write-protected: clients get read access needed for realtime availability, but inserts/deletes are performed only through authenticated RPC functions. RLS is enabled on profiles, rooms, room rules, and reservations.
 
-For a real university deployment, add VKU SSO/OIDC, server-side role management, audit logging and operational monitoring before opening registration broadly.
+For the production booking lifecycle, the fourth migration adds:
+- server-owned `confirmed`, `checked_in`, and `cancelled` states instead of deleting booking history;
+- owner-only reservation reads so student details do not travel through shared availability events;
+- a minimal `booking_occupancy` table for realtime room/date/slot availability;
+- server-authoritative check-in, allowed from 30 minutes before the booking until it ends;
+- realtime occupancy INSERT/DELETE events so another device sees a slot become unavailable/available without refreshing.
+
+For a real university deployment, add VKU SSO/OIDC, server-side role management, audit logging, monitoring, and custom SMTP before opening registration broadly. Supabase's built-in email sender is rate-limited and best-effort; custom SMTP is recommended for production.

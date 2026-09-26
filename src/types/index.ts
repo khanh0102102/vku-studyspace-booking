@@ -1,5 +1,6 @@
 export type Building = 'A' | 'B' | 'C' | 'V';
 export type Equipment = 'Projector' | 'Whiteboard' | 'High-spec PC' | 'AC';
+export type ReservationStatus = 'confirmed' | 'checked_in' | 'cancelled';
 
 export interface TimeSlot {
   id: string;
@@ -40,7 +41,19 @@ export interface Reservation {
   qrValue: string;
   studentId: string;
   createdAt: string;
+  status: ReservationStatus;
   notificationId?: string;
+  cancelledAt?: string;
+  checkedInAt?: string;
+}
+
+export interface BookingAvailability {
+  reservationId: string;
+  roomId: string;
+  dateKey: string;
+  slotId: string;
+  startAt: string;
+  endAt: string;
 }
 
 export interface BookingFilters {

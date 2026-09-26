@@ -16,7 +16,11 @@ import { colors, shadows } from '@/src/constants/theme';
 import { cancelBookingReminder } from '@/src/services/notifications';
 import { useBookingStore } from '@/src/store/useBookingStore';
 import { Reservation, RootStackParamList } from '@/src/types';
-import { isReservationPast } from '@/src/utils/booking';
+import {
+  canCancelReservation,
+  canCheckInReservation,
+  isReservationPast,
+} from '@/src/utils/booking';
 import { prettyDate } from '@/src/utils/date';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'MyBookings'>;
@@ -27,25 +31,60 @@ interface BookingCardProps {
   onCancel: (reservation: Reservation) => void;
 }
 
+function statusLabel(reservation: Reservation, now = new Date()): string {
+  if (reservation.status === 'cancelled') return 'Cancelled';
+  if (reservation.status === 'checked_in') return 'Checked in';
+  if (isReservationPast(reservation, now)) return 'Past';
+  return 'Confirmed';
+}
+
 const BookingCard = React.memo(function BookingCard({
   reservation,
   onOpenPass,
   onCancel,
 }: BookingCardProps) {
   const past = isReservationPast(reservation);
+  const cancelled = reservation.status === 'cancelled';
+  const checkedIn = reservation.status === 'checked_in';
+  const checkInReady = canCheckInReservation(reservation);
+
+  const statusStyle = cancelled
+    ? styles.cancelledStatus
+    : checkedIn
+      ? styles.checkedInStatus
+      : past
+        ? styles.pastStatus
+        : styles.confirmedStatus;
+
+  const statusTextStyle = cancelled
+    ? styles.cancelledText
+    : checkedIn
+      ? styles.checkedInText
+      : past
+        ? styles.pastText
+        : styles.confirmedText;
+
   return (
     <View style={styles.card}>
       <View style={styles.cardTop}>
         <View style={styles.roomIcon}>
-          <Ionicons color={colors.primary} name="business-outline" size={22} />
+          <Ionicons
+            color={cancelled ? colors.muted : colors.primary}
+            name="business-outline"
+            size={22}
+          />
         </View>
         <View style={styles.cardTitle}>
-          <Text numberOfLines={1} style={styles.roomName}>{reservation.roomName}</Text>
-          <Text style={styles.roomMeta}>{'Building ' + reservation.building + ' · ' + reservation.floor}</Text>
+          <Text numberOfLines={1} style={styles.roomName}>
+            {reservation.roomName}
+          </Text>
+          <Text style={styles.roomMeta}>
+            {'Building ' + reservation.building + ' · ' + reservation.floor}
+          </Text>
         </View>
-        <View style={[styles.status, past ? styles.pastStatus : styles.confirmedStatus]}>
-          <Text style={[styles.statusText, past ? styles.pastText : styles.confirmedText]}>
-            {past ? 'Past' : 'Confirmed'}
+        <View style={[styles.status, statusStyle]}>
+          <Text style={[styles.statusText, statusTextStyle]}>
+            {statusLabel(reservation)}
           </Text>
         </View>
       </View>
@@ -60,19 +99,34 @@ const BookingCard = React.memo(function BookingCard({
 
       <View style={styles.divider} />
       <View style={styles.actions}>
-        <Pressable
-          onPress={() => onOpenPass(reservation)}
-          style={({ pressed }) => [styles.passButton, pressed && styles.pressed]}
-        >
-          <Ionicons color={colors.primary} name="qr-code-outline" size={18} />
-          <Text style={styles.passText}>Show QR pass</Text>
-        </Pressable>
-        {!past && (
+        {!cancelled && (
+          <Pressable
+            disabled={past}
+            onPress={() => onOpenPass(reservation)}
+            style={({ pressed }) => [
+              styles.passButton,
+              past && styles.disabledAction,
+              pressed && !past && styles.pressed,
+            ]}
+          >
+            <Ionicons color={past ? colors.muted : colors.primary} name="qr-code-outline" size={18} />
+            <Text style={[styles.passText, past && styles.disabledText]}>Show QR pass</Text>
+          </Pressable>
+        )}
+        {canCancelReservation(reservation) && !checkedIn && (
           <Pressable
             onPress={() => onCancel(reservation)}
             style={({ pressed }) => [styles.cancelButton, pressed && styles.pressed]}
           >
             <Text style={styles.cancelText}>Cancel</Text>
+          </Pressable>
+        )}
+        {checkInReady && !checkedIn && (
+          <Pressable
+            onPress={() => onOpenPass(reservation)}
+            style={({ pressed }) => [styles.checkInButton, pressed && styles.pressed]}
+          >
+            <Text style={styles.checkInText}>Check in</Text>
           </Pressable>
         )}
       </View>
@@ -83,6 +137,7 @@ const BookingCard = React.memo(function BookingCard({
 export function MyBookingsScreen({ navigation }: Props) {
   const reservations = useBookingStore((state) => state.reservations);
   const cancelBooking = useBookingStore((state) => state.cancelBooking);
+  const checkInBooking = useBookingStore((state) => state.checkInBooking);
   const [passReservation, setPassReservation] = React.useState<Reservation | null>(null);
 
   const orderedReservations = React.useMemo(
@@ -115,7 +170,9 @@ export function MyBookingsScreen({ navigation }: Props) {
                   await cancelBooking(reservation.id);
                 } catch (error) {
                   const message =
-                    error instanceof Error ? error.message : 'Could not cancel this reservation.';
+                    error instanceof Error
+                      ? error.message
+                      : 'Could not cancel this reservation.';
                   Alert.alert('Could not cancel reservation', message);
                 }
               })();
@@ -125,6 +182,17 @@ export function MyBookingsScreen({ navigation }: Props) {
       );
     },
     [cancelBooking],
+  );
+
+  const checkInSelectedBooking = React.useCallback(
+    async (reservationId: string) => {
+      const checkedIn = await checkInBooking(reservationId);
+      if (!checkedIn) {
+        throw new Error('Could not find this booking.');
+      }
+      return checkedIn;
+    },
+    [checkInBooking],
   );
 
   const renderBooking = React.useCallback(
@@ -150,7 +218,7 @@ export function MyBookingsScreen({ navigation }: Props) {
         </Pressable>
         <View>
           <Text style={styles.heading}>My bookings</Text>
-          <Text style={styles.subtitle}>Your study room reservation passes</Text>
+          <Text style={styles.subtitle}>Your reservation history and check-in passes</Text>
         </View>
       </View>
 
@@ -179,7 +247,11 @@ export function MyBookingsScreen({ navigation }: Props) {
         showsVerticalScrollIndicator={false}
       />
 
-      <BookingPassModal onClose={() => setPassReservation(null)} reservation={passReservation} />
+      <BookingPassModal
+        onCheckIn={checkInSelectedBooking}
+        onClose={() => setPassReservation(null)}
+        reservation={passReservation}
+      />
     </SafeAreaView>
   );
 }
@@ -263,6 +335,12 @@ const styles = StyleSheet.create({
   confirmedStatus: {
     backgroundColor: colors.successSoft,
   },
+  checkedInStatus: {
+    backgroundColor: colors.chip,
+  },
+  cancelledStatus: {
+    backgroundColor: colors.dangerSoft,
+  },
   pastStatus: {
     backgroundColor: '#EDF0F5',
   },
@@ -272,6 +350,12 @@ const styles = StyleSheet.create({
   },
   confirmedText: {
     color: colors.success,
+  },
+  checkedInText: {
+    color: colors.primaryDark,
+  },
+  cancelledText: {
+    color: colors.danger,
   },
   pastText: {
     color: colors.muted,
@@ -301,17 +385,36 @@ const styles = StyleSheet.create({
   actions: {
     alignItems: 'center',
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    gap: 12,
+    justifyContent: 'flex-end',
     marginTop: 12,
   },
   passButton: {
     alignItems: 'center',
     flexDirection: 'row',
     gap: 5,
+    marginRight: 'auto',
   },
   passText: {
     color: colors.primary,
     fontSize: 13,
+    fontWeight: '800',
+  },
+  disabledAction: {
+    opacity: 0.55,
+  },
+  disabledText: {
+    color: colors.muted,
+  },
+  checkInButton: {
+    backgroundColor: colors.primary,
+    borderRadius: 9,
+    paddingHorizontal: 11,
+    paddingVertical: 7,
+  },
+  checkInText: {
+    color: colors.surface,
+    fontSize: 12,
     fontWeight: '800',
   },
   cancelButton: {
