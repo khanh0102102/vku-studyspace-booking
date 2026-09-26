@@ -97,3 +97,16 @@ export async function signOut(): Promise<void> {
     throw new Error(error.message);
   }
 }
+
+
+export async function resendSignupConfirmation(email: string): Promise<void> {
+  const client = requireSupabase();
+  const { error } = await client.auth.resend({
+    type: 'signup',
+    email,
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+}
