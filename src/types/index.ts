@@ -37,6 +37,7 @@ export interface Reservation {
   startAt: string;
   endAt: string;
   qrValue: string;
+  studentId: string;
   createdAt: string;
   notificationId?: string;
 }
@@ -53,6 +54,15 @@ export interface UserSession {
   fullName: string;
   studentId: string;
   email: string;
+}
+
+export type RealtimeStatus = 'offline' | 'connecting' | 'connected' | 'error';
+
+export interface BookingChange {
+  roomId: string;
+  dateKey: string;
+  slotId: string;
+  reserved: boolean;
 }
 
 export type RootStackParamList = {
