@@ -15,13 +15,15 @@ Never put a service_role or sb_secret_* key in the Expo app.
 
 Open **Authentication → Providers** and keep the **Email** provider enabled.
 
-For the student-only demo, the database trigger accepts only addresses ending in @vku.udn.vn.
+For this project demo, open the **Email** provider settings and turn **Confirm email** **OFF**. This makes password sign-up create an authenticated session immediately, so the student can enter the app without opening an email.
 
-Recommended production settings:
-- require email confirmation;
-- use a strong password policy;
-- configure the production Site URL and redirect URLs for the deployed web app;
-- use a university SSO/OIDC provider instead of password auth when VKU provides one.
+The app still performs basic client-side validation:
+- email must use the @vku.udn.vn domain;
+- password must be at least 8 characters;
+- full name must contain at least 2 characters;
+- student ID must contain 3–20 letters or numbers.
+
+The database trigger still accepts only addresses ending in @vku.udn.vn.
 
 ## 3. Apply the migrations
 
@@ -59,10 +61,10 @@ On Vercel, add the same two variables as **Config** variables for Production/Pre
 A new student:
 1. Opens VKU StudySpace.
 2. Enters full name, student ID, VKU email and password.
-3. Supabase Auth creates the user.
-4. The database trigger creates public.profiles.
-5. After email confirmation, the student signs in.
-6. The app stores the Supabase Auth session and loads the user's profile.
+3. The app validates the basic fields.
+4. Supabase Auth creates the user and returns a session immediately because email confirmation is disabled for this demo.
+5. The database trigger creates public.profiles.
+6. The app loads the user's profile and opens the main booking screens.
 
 Chrome and Edge therefore have separate browser auth storage. A booking created by one signed-in account appears under **My bookings** only for that account.
 
